@@ -11,7 +11,8 @@ import Calculator from "./pages/Calculator";
 import SimulationHistory from "./pages/SimulationHistory";
 
 // 👇 IMPORTA EL FOOTER
-import Footer from "/src/components/Footer";
+import Footer from "./components/Footer";
+
 
 
 
