@@ -11,6 +11,17 @@ interface Simulation {
   product_type?: string | null;
   notes?: string | null;
   created_at: string;
+
+  // Nuevos campos opcionales
+  currency?: string | null;
+  rate_type?: string | null;
+  capitalization?: number | null;
+  grace_type?: string | null;
+  grace_months?: number | null;
+  bono_amount?: number | null;
+  bank_name?: string | null;
+  npv?: number | null;
+  irr?: number | null;
 }
 
 interface UserStored {
@@ -19,12 +30,15 @@ interface UserStored {
   email: string;
 }
 
-const formatMoney = (value: number) =>
-  value.toLocaleString("es-PE", {
+const formatMoney = (value: number, currency: string = "PEN") => {
+  const code = currency === "USD" ? "USD" : "PEN";
+  const locale = currency === "USD" ? "en-US" : "es-PE";
+  return value.toLocaleString(locale, {
     style: "currency",
-    currency: "PEN",
+    currency: code,
     minimumFractionDigits: 2,
   });
+};
 
 const SimulationHistory: React.FC = () => {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
@@ -74,11 +88,9 @@ const SimulationHistory: React.FC = () => {
         throw new Error(data.error || "Error al obtener el historial.");
       }
 
-      // 👇 Normalizamos la respuesta del backend
       const rawList = data.simulations || data.simulaciones || [];
 
       const normalized: Simulation[] = rawList.map((item: any) => {
-        // soportamos nombres en español e inglés por si mezclas fuentes
         const termYears =
           item.term_years ??
           item["años_plazo"] ??
@@ -86,6 +98,56 @@ const SimulationHistory: React.FC = () => {
           item["plazo_años"] ??
           item.plazo_años ??
           0;
+
+        const currency =
+          item.currency ??
+          item.moneda ??
+          null;
+
+        const rate_type =
+          item.rate_type ??
+          item.tipo_tasa ??
+          null;
+
+        const capitalization =
+          item.capitalization ??
+          item.capitalizacion ??
+          null;
+
+        const grace_type =
+          item.grace_type ??
+          item.tipo_gracia ??
+          null;
+
+        const grace_monthsRaw =
+          item.grace_months ??
+          item.meses_gracia ??
+          null;
+        const grace_months =
+          grace_monthsRaw !== null && grace_monthsRaw !== undefined
+            ? Number(grace_monthsRaw)
+            : null;
+
+        const bono_amount =
+          item.bono_amount ??
+          item.monto_bono ??
+          null;
+
+        const bank_name =
+          item.bank_name ??
+          item.entidad ??
+          item.entity_name ??
+          null;
+
+        const npv =
+          item.npv ??
+          item.van ??
+          null;
+
+        const irr =
+          item.irr ??
+          item.tir ??
+          null;
 
         return {
           id: Number(item.id),
@@ -99,6 +161,15 @@ const SimulationHistory: React.FC = () => {
             item.product_type ?? item.tipo_de_producto ?? null,
           notes: item.notes ?? item.notas ?? null,
           created_at: item.created_at ?? item.creado_en ?? "",
+          currency,
+          rate_type,
+          capitalization: capitalization !== null ? Number(capitalization) : null,
+          grace_type,
+          grace_months,
+          bono_amount: bono_amount !== null ? Number(bono_amount) : null,
+          bank_name,
+          npv: npv !== null ? Number(npv) : null,
+          irr: irr !== null ? Number(irr) : null,
         };
       });
 
@@ -113,7 +184,7 @@ const SimulationHistory: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold text-slate-800 mb-4">
         Historial de simulaciones
       </h1>
@@ -141,52 +212,87 @@ const SimulationHistory: React.FC = () => {
 
       {!loading && !error && simulations.length > 0 && (
         <div className="overflow-x-auto mt-4 border border-slate-200 rounded-lg">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-xs md:text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-3 py-2 text-left text-slate-700">Fecha</th>
                 <th className="px-3 py-2 text-left text-slate-700">Monto</th>
-                <th className="px-3 py-2 text-left text-slate-700">
-                  Tasa anual
-                </th>
-                <th className="px-3 py-2 text-left text-slate-700">
-                  Plazo (años)
-                </th>
+                <th className="px-3 py-2 text-left text-slate-700">Moneda</th>
+                <th className="px-3 py-2 text-left text-slate-700">Tasa anual</th>
+                <th className="px-3 py-2 text-left text-slate-700">Tipo tasa</th>
+                <th className="px-3 py-2 text-left text-slate-700">Plazo (años)</th>
                 <th className="px-3 py-2 text-left text-slate-700">
                   Cuota mensual
                 </th>
                 <th className="px-3 py-2 text-left text-slate-700">
+                  Entidad
+                </th>
+                <th className="px-3 py-2 text-left text-slate-700">
+                  VAN
+                </th>
+                <th className="px-3 py-2 text-left text-slate-700">
+                  TIR
+                </th>
+                <th className="px-3 py-2 text-left text-slate-700">
                   Producto
                 </th>
-                <th className="px-3 py-2 text-left text-slate-700">Notas</th>
+                <th className="px-3 py-2 text-left text-slate-700">
+                  Notas
+                </th>
               </tr>
             </thead>
             <tbody>
-              {simulations.map((sim) => (
-                <tr key={sim.id} className="border-t border-slate-200">
-                  <td className="px-3 py-2 text-slate-700">
-                    {new Date(sim.created_at).toLocaleString("es-PE")}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {formatMoney(sim.amount)}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {sim.annual_rate.toFixed(2)}%
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {sim.term_years}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {formatMoney(sim.monthly_payment)}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {sim.product_type || "-"}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {sim.notes || "-"}
-                  </td>
-                </tr>
-              ))}
+              {simulations.map((sim) => {
+                const cur = sim.currency || "PEN";
+                return (
+                  <tr key={sim.id} className="border-t border-slate-200">
+                    <td className="px-3 py-2 text-slate-700">
+                      {new Date(sim.created_at).toLocaleString("es-PE")}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {formatMoney(sim.amount, cur)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {cur === "USD" ? "USD $" : "PEN S/"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.annual_rate.toFixed(2)}%
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.rate_type === "nominal"
+                        ? "Nominal"
+                        : sim.rate_type === "effective"
+                        ? "Efectiva"
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.term_years}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {formatMoney(sim.monthly_payment, cur)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.bank_name || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.npv !== null && sim.npv !== undefined
+                        ? formatMoney(sim.npv, cur)
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.irr !== null && sim.irr !== undefined
+                        ? `${sim.irr.toFixed(2)}%`
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.product_type || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">
+                      {sim.notes || "-"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
